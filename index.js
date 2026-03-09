@@ -1,0 +1,105 @@
+const WebSocket = require("ws");
+const https = require("https");
+const http = require("http");
+const { URL } = require("url");
+
+// ======= הגדר כאן את כתובת ה-GAS שלך =======
+const GAS_URL = "https://script.google.com/macros/s/AKfycbxRTPXJCEWSOUH6bpKh0bDZ2F5zR7MCHPy2IrRmnj0R7Y4b80JbKt10eOqSNi3Hnryr2g/exec";
+// ============================================
+
+const WSS_URL = "wss://ws.tzevaadom.co.il/socket?platform=WEB";
+const RECONNECT_DELAY = 5000; // 5 שניות בין ניסיונות חיבור מחדש
+
+function sendToGAS(data) {
+  // fire & forget — לא מחכים לתשובה
+  try {
+    const url = new URL(GAS_URL);
+    const body = JSON.stringify(data);
+
+    const options = {
+      hostname: url.hostname,
+      path: url.pathname + url.search,
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Content-Length": Buffer.byteLength(body),
+      },
+    };
+
+    const req = https.request(options);
+    req.on("error", () => {}); // מתעלם משגיאות — לא מעניין אותנו
+    req.write(body);
+    req.end();
+  } catch (e) {
+    // לא עושים כלום — ממשיכים להקשיב
+  }
+}
+
+function connect() {
+  console.log("מתחבר ל-WSS...");
+
+  const ws = new WebSocket(WSS_URL, {
+    headers: {
+      "Origin": "https://www.tzevaadom.co.il",
+      "Host": "ws.tzevaadom.co.il",
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+      "Accept-Language": "he-IL,he;q=0.9,en-US;q=0.8,en;q=0.7",
+      "Cache-Control": "no-cache",
+      "Pragma": "no-cache",
+    },
+  });
+
+  ws.on("open", () => {
+    console.log("מחובר! ממתין להתראות...");
+  });
+
+  ws.on("message", (raw) => {
+    // מסנן בינארי
+    if (Buffer.isBuffer(raw)) return;
+
+    const text = raw.toString().trim();
+
+    // מסנן ריק
+    if (!text) return;
+
+    // מנסה לפרסר JSON
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch (e) {
+      return; // לא JSON תקני — מתעלם
+    }
+
+    // מסנן פינג / הודעות מערכת ריקות
+    if (!parsed || typeof parsed !== "object") return;
+    if (Object.keys(parsed).length === 0) return;
+
+    // שולח ל-GAS — fire & forget
+    sendToGAS(parsed);
+    console.log("נשלח:", JSON.stringify(parsed).substring(0, 80));
+  });
+
+  ws.on("ping", () => {
+    // מגיב אוטומטית ל-ping של השרת (Node.js ws עושה זאת אוטומטית)
+  });
+
+  ws.on("close", (code, reason) => {
+    console.log(`חיבור נסגר (${code}). מתחבר מחדש בעוד ${RECONNECT_DELAY / 1000} שניות...`);
+    setTimeout(connect, RECONNECT_DELAY);
+  });
+
+  ws.on("error", (err) => {
+    console.log("שגיאת WebSocket:", err.message);
+    // close יופעל אחרי error אוטומטית — reconnect יקרה שם
+  });
+}
+
+// שרת HTTP קטן — נדרש ע"י Render כדי שיידע שהשירות חי
+const server = http.createServer((req, res) => {
+  res.writeHead(200);
+  res.end("OK");
+});
+server.listen(process.env.PORT || 3000, () => {
+  console.log("שרת HTTP חי על פורט", process.env.PORT || 3000);
+  connect(); // מתחיל את חיבור ה-WSS
+});
