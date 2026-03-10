@@ -104,6 +104,10 @@ function connect() {
     console.log("נשלח:", JSON.stringify(parsed).substring(0, 80));
   });
 
+  ws.on("ping", () => {
+    resetWatchdog();
+  });
+
   ws.on("close", (code) => {
     if (watchdog) clearTimeout(watchdog);
     console.log(`חיבור נסגר (${code}). מתחבר מחדש בעוד ${RECONNECT_DELAY / 1000} שניות...`);
