@@ -4,7 +4,7 @@ const http = require("http");
 const { URL } = require("url");
 
 // ======= הגדר כאן את כתובת ה-GAS שלך =======
-const GAS_URL = "https://script.google.com/macros/s/AKfycbxRTPXJCEWSOUH6bpKh0bDZ2F5zR7MCHPy2IrRmnj0R7Y4b80JbKt10eOqSNi3Hnryr2g/exec";
+const GAS_URL = process.env.GAS_URL || "https://script.google.com/macros/s/AKfycbxRTPXJCEWSOUH6bpKh0bDZ2F5zR7MCHPy2IrRmnj0R7Y4b80JbKt10eOqSNi3Hnryr2g/exec";
 // ============================================
 
 const WSS_URL = "wss://ws.tzevaadom.co.il/socket?platform=WEB";
@@ -73,8 +73,12 @@ function connect() {
       : raw.toString().substring(0, 120);
     console.log("הודעה התקבלה:", preview);
 
-    // מסנן בינארי
-    if (Buffer.isBuffer(raw)) return;
+    // בינארי = פינג — שולח לGAS ויוצא
+    if (Buffer.isBuffer(raw)) {
+      console.log("פינג בינארי התקבל —", new Date().toISOString());
+      sendToGAS({ type: "PING", time: new Date().toISOString() });
+      return;
+    }
 
     const text = raw.toString().trim();
 
