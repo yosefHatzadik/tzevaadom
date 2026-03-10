@@ -123,7 +123,8 @@ const SERVER_URL = process.env.RENDER_EXTERNAL_URL;
 
 function selfPing() {
   if (!SERVER_URL) return;
-  http.get(SERVER_URL, (res) => {
+  const lib = SERVER_URL.startsWith("https") ? https : http;
+  lib.get(SERVER_URL, (res) => {
     res.resume();
     console.log("Self-ping נשלח —", new Date().toISOString());
   }).on("error", () => {});
