@@ -76,7 +76,7 @@ function connect() {
 
     if (Buffer.isBuffer(raw)) {
       if (raw.length === 0) {
-        console.log("פינג בינארי ריק —", new Date().toISOString());
+        console.log("ping —", new Date().toISOString());
         sendToGAS({ type: "PING", time: new Date().toISOString() });
         return;
       }
