@@ -119,6 +119,16 @@ function connect() {
   });
 }
 
+const SERVER_URL = process.env.RENDER_EXTERNAL_URL;
+
+function selfPing() {
+  if (!SERVER_URL) return;
+  http.get(SERVER_URL, (res) => {
+    res.resume();
+    console.log("Self-ping נשלח —", new Date().toISOString());
+  }).on("error", () => {});
+}
+
 const server = http.createServer((req, res) => {
   res.writeHead(200);
   res.end("OK");
@@ -126,4 +136,5 @@ const server = http.createServer((req, res) => {
 server.listen(process.env.PORT || 3000, () => {
   console.log("שרת HTTP חי על פורט", process.env.PORT || 3000);
   connect();
+  setInterval(selfPing, 14 * 60 * 1000); // כל 14 דקות
 });
