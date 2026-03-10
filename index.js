@@ -4,7 +4,7 @@ const http = require("http");
 const { URL } = require("url");
 
 // ======= הגדר כאן את כתובת ה-GAS שלך =======
-const GAS_URL = process.env.GAS_URL || "https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec";
+const GAS_URL = "https://script.google.com/macros/s/AKfycbxRTPXJCEWSOUH6bpKh0bDZ2F5zR7MCHPy2IrRmnj0R7Y4b80JbKt10eOqSNi3Hnryr2g/exec";
 // ============================================
 
 const WSS_URL = "wss://ws.tzevaadom.co.il/socket?platform=WEB";
@@ -93,7 +93,8 @@ function connect() {
   });
 
   ws.on("ping", () => {
-    // מגיב אוטומטית ל-ping של השרת (Node.js ws עושה זאת אוטומטית)
+    console.log("פינג התקבל מהשרת —", new Date().toISOString());
+    sendToGAS({ type: "PING_TEST", time: new Date().toISOString() });
   });
 
   ws.on("close", (code, reason) => {
