@@ -3,10 +3,7 @@ const https = require("https");
 const http = require("http");
 const { URL } = require("url");
 
-// ======= הגדר כאן את כתובת ה-GAS שלך =======
-const GAS_URL = process.env.GAS_URL || "https://script.google.com/macros/s/AKfycbxRTPXJCEWSOUH6bpKh0bDZ2F5zR7MCHPy2IrRmnj0R7Y4b80JbKt10eOqSNi3Hnryr2g/exec";
-// ============================================
-
+const GAS_URL = process.env.GAS_URL;
 const WSS_URL = "wss://ws.tzevaadom.co.il/socket?platform=WEB";
 const RECONNECT_DELAY = 5000;
 
@@ -48,6 +45,16 @@ function sendToGAS(data) {
 function connect() {
   console.log("מתחבר ל-WSS...");
 
+  let watchdog = null;
+
+  function resetWatchdog() {
+    if (watchdog) clearTimeout(watchdog);
+    watchdog = setTimeout(() => {
+      console.log("Watchdog — לא התקבלה הודעה 10 דקות, מנתק ומתחבר מחדש...");
+      ws.terminate();
+    }, 4 * 60 * 1000);
+  }
+
   const ws = new WebSocket(WSS_URL, {
     headers: {
       "Origin": "https://www.tzevaadom.co.il",
@@ -61,22 +68,22 @@ function connect() {
 
   ws.on("open", () => {
     console.log("מחובר! ממתין להתראות...");
+    resetWatchdog();
   });
 
   ws.on("message", (raw) => {
-    // בינארי — מנסה לפרסר כטקסט
+    resetWatchdog();
+
     if (Buffer.isBuffer(raw)) {
       if (raw.length === 0) {
         console.log("פינג בינארי ריק —", new Date().toISOString());
         sendToGAS({ type: "PING", time: new Date().toISOString() });
         return;
       }
-      // בינארי עם תוכן — ממיר לטקסט וממשיך לעיבוד
       raw = Buffer.from(raw).toString("utf8");
     }
 
     const text = raw.toString().trim();
-
     if (!text) return;
 
     let parsed;
@@ -98,6 +105,7 @@ function connect() {
   });
 
   ws.on("close", (code) => {
+    if (watchdog) clearTimeout(watchdog);
     console.log(`חיבור נסגר (${code}). מתחבר מחדש בעוד ${RECONNECT_DELAY / 1000} שניות...`);
     setTimeout(connect, RECONNECT_DELAY);
   });
@@ -107,7 +115,6 @@ function connect() {
   });
 }
 
-// שרת HTTP קטן — נדרש ע"י Render
 const server = http.createServer((req, res) => {
   res.writeHead(200);
   res.end("OK");
