@@ -8,10 +8,9 @@ const GAS_URL = process.env.GAS_URL || "https://script.google.com/macros/s/AKfyc
 // ============================================
 
 const WSS_URL = "wss://ws.tzevaadom.co.il/socket?platform=WEB";
-const RECONNECT_DELAY = 5000; // 5 שניות בין ניסיונות חיבור מחדש
+const RECONNECT_DELAY = 5000;
 
 function sendToGAS(data) {
-  // fire & forget עם תמיכה ב-redirect (GAS מבצע 302)
   const body = JSON.stringify(data);
 
   function doRequest(urlStr) {
@@ -30,12 +29,10 @@ function sendToGAS(data) {
       };
 
       const req = lib.request(options, (res) => {
-        // עוקב אחרי redirect
         if ((res.statusCode === 301 || res.statusCode === 302 || res.statusCode === 307) && res.headers.location) {
           doRequest(res.headers.location);
           return;
         }
-        // מרוקן את ה-response כדי לשחרר את החיבור
         res.resume();
       });
 
@@ -67,12 +64,6 @@ function connect() {
   });
 
   ws.on("message", (raw) => {
-    // לוג גולמי לכל הודעה — לצורך דיבוג
-    const preview = Buffer.isBuffer(raw)
-      ? "[בינארי " + raw.length + " bytes]"
-      : raw.toString().substring(0, 120);
-    console.log("הודעה התקבלה:", preview);
-
     // בינארי — מנסה לפרסר כטקסט
     if (Buffer.isBuffer(raw)) {
       if (raw.length === 0) {
@@ -86,10 +77,8 @@ function connect() {
 
     const text = raw.toString().trim();
 
-    // מסנן ריק
     if (!text) return;
 
-    // מנסה לפרסר JSON
     let parsed;
     try {
       parsed = JSON.parse(text);
@@ -98,44 +87,32 @@ function connect() {
       return;
     }
 
-    // מסנן פינג / הודעות מערכת ריקות
     if (!parsed || typeof parsed !== "object") return;
     if (Object.keys(parsed).length === 0) {
       console.log("אובייקט ריק — מתעלם");
       return;
     }
 
-    // שולח ל-GAS — fire & forget
     sendToGAS(parsed);
     console.log("נשלח:", JSON.stringify(parsed).substring(0, 80));
   });
 
-  ws.on("ping", () => {
-    console.log("WebSocket ping frame התקבל —", new Date().toISOString());
-  });
-
-  ws.on("ping", () => {
-    console.log("פינג התקבל מהשרת —", new Date().toISOString());
-    sendToGAS({ type: "PING_TEST", time: new Date().toISOString() });
-  });
-
-  ws.on("close", (code, reason) => {
+  ws.on("close", (code) => {
     console.log(`חיבור נסגר (${code}). מתחבר מחדש בעוד ${RECONNECT_DELAY / 1000} שניות...`);
     setTimeout(connect, RECONNECT_DELAY);
   });
 
   ws.on("error", (err) => {
     console.log("שגיאת WebSocket:", err.message);
-    // close יופעל אחרי error אוטומטית — reconnect יקרה שם
   });
 }
 
-// שרת HTTP קטן — נדרש ע"י Render כדי שיידע שהשירות חי
+// שרת HTTP קטן — נדרש ע"י Render
 const server = http.createServer((req, res) => {
   res.writeHead(200);
   res.end("OK");
 });
 server.listen(process.env.PORT || 3000, () => {
   console.log("שרת HTTP חי על פורט", process.env.PORT || 3000);
-  connect(); // מתחיל את חיבור ה-WSS
+  connect();
 });
