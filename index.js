@@ -67,6 +67,12 @@ function connect() {
   });
 
   ws.on("message", (raw) => {
+    // לוג גולמי לכל הודעה — לצורך דיבוג
+    const preview = Buffer.isBuffer(raw)
+      ? "[בינארי " + raw.length + " bytes]"
+      : raw.toString().substring(0, 120);
+    console.log("הודעה התקבלה:", preview);
+
     // מסנן בינארי
     if (Buffer.isBuffer(raw)) return;
 
@@ -80,16 +86,24 @@ function connect() {
     try {
       parsed = JSON.parse(text);
     } catch (e) {
-      return; // לא JSON תקני — מתעלם
+      console.log("לא JSON:", text.substring(0, 80));
+      return;
     }
 
     // מסנן פינג / הודעות מערכת ריקות
     if (!parsed || typeof parsed !== "object") return;
-    if (Object.keys(parsed).length === 0) return;
+    if (Object.keys(parsed).length === 0) {
+      console.log("אובייקט ריק — מתעלם");
+      return;
+    }
 
     // שולח ל-GAS — fire & forget
     sendToGAS(parsed);
     console.log("נשלח:", JSON.stringify(parsed).substring(0, 80));
+  });
+
+  ws.on("ping", () => {
+    console.log("WebSocket ping frame התקבל —", new Date().toISOString());
   });
 
   ws.on("ping", () => {
