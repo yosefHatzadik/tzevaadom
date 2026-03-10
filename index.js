@@ -73,11 +73,15 @@ function connect() {
       : raw.toString().substring(0, 120);
     console.log("הודעה התקבלה:", preview);
 
-    // בינארי = פינג — שולח לGAS ויוצא
+    // בינארי — מנסה לפרסר כטקסט
     if (Buffer.isBuffer(raw)) {
-      console.log("פינג בינארי התקבל —", new Date().toISOString());
-      sendToGAS({ type: "PING", time: new Date().toISOString() });
-      return;
+      if (raw.length === 0) {
+        console.log("פינג בינארי ריק —", new Date().toISOString());
+        sendToGAS({ type: "PING", time: new Date().toISOString() });
+        return;
+      }
+      // בינארי עם תוכן — ממיר לטקסט וממשיך לעיבוד
+      raw = Buffer.from(raw).toString("utf8");
     }
 
     const text = raw.toString().trim();
